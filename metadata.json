@@ -1,0 +1,6 @@
+{
+  "name": "Gerçeklik Oyunu",
+  "description": "Kartlar, coinler ve bağlantı oklarıyla zihin ve gerçeklik haritaları oluşturma, düzenleme ve analiz uygulaması.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
