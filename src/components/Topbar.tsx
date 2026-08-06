@@ -7,12 +7,15 @@ import {
   Download,
   HelpCircle,
   Menu,
-  Sparkles,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface TopbarProps {
   isConnectMode: boolean;
   onToggleConnectMode: () => void;
+  isQuietHighlightMode?: boolean;
+  onToggleQuietHighlightMode?: () => void;
   onOpenProjectModal: () => void;
   onOpenHelpModal: () => void;
   onOpenTemplatesModal: () => void;
@@ -28,6 +31,8 @@ interface TopbarProps {
 export const Topbar: React.FC<TopbarProps> = ({
   isConnectMode,
   onToggleConnectMode,
+  isQuietHighlightMode = false,
+  onToggleQuietHighlightMode,
   onOpenProjectModal,
   onOpenHelpModal,
   onOpenTemplatesModal,
@@ -49,8 +54,8 @@ export const Topbar: React.FC<TopbarProps> = ({
         <div className="leading-tight">
           <h1 className="font-black text-xs text-gray-100 tracking-tight flex items-center gap-1">
             <span>RRP</span>
-            <span className="text-[9px] font-bold px-1 py-0.2 bg-blue-950 text-blue-400 rounded border border-blue-800/80">
-              v5
+            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-blue-950 text-blue-300 rounded border border-blue-800/80">
+              v1 Beta
             </span>
           </h1>
         </div>
@@ -101,6 +106,21 @@ export const Topbar: React.FC<TopbarProps> = ({
         >
           <ArrowRightLeft size={14} />
           <span>{isConnectMode ? '🔗 Ok Bağlama Aktif' : '🔗 Ok Bağla'}</span>
+        </button>
+
+        {/* 5. Sessiz Mod & Sessiz Oklar Toggle */}
+        <button
+          onClick={onToggleQuietHighlightMode}
+          className={`px-2.5 py-1.5 font-bold text-xs rounded-lg flex items-center gap-1.5 transition-all border ${
+            isQuietHighlightMode
+              ? 'bg-purple-900/90 text-purple-200 border-purple-600 ring-2 ring-purple-500/40 shadow-[0_0_12px_rgba(168,85,247,0.3)]'
+              : 'bg-gray-900 hover:bg-gray-800 text-gray-300 border-gray-700'
+          }`}
+          title="Sessiz Mod: Sessiz özellikleri ve tırtıklı gri okları masa üzerinde vurgular"
+        >
+          {isQuietHighlightMode ? <Eye size={14} className="text-purple-400" /> : <EyeOff size={14} className="text-gray-400" />}
+          <span className="hidden md:inline">{isQuietHighlightMode ? 'Sessiz Mod: AKTİF' : 'Sessiz Mod'}</span>
+          <span className="md:hidden">Sessiz</span>
         </button>
 
         <div className="h-4 w-px bg-gray-800 mx-0.5 hidden sm:block" />

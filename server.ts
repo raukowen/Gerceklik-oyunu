@@ -30,6 +30,77 @@ async function startServer() {
       const { mode, mapA, mapB, inputItem } = req.body;
       const ai = new GoogleGenAI({ apiKey });
 
+      if (mode === "TEXT_TO_REALITY_MAP") {
+        const { textContent } = req.body;
+        if (!textContent || !textContent.trim()) {
+          return res.status(400).json({ error: "Lütfen dönüştürülecek bir metin içeriği girin." });
+        }
+
+        const prompt = `
+Sen "Gerçeklik Oyunu (RRP)" Yapay Zeka Ajanısın.
+Görevin: Kullanıcının girdiği metin içeriğini (toplantı notu, senaryo, proje fikri veya görev listesi) analiz ederek Gerçeklik Oyunu (RRP) standartlarına %100 uygun bir harita yapısına (XL/L/M/S kartlar, Coinler ve Bağlantı Okları) dönüştürmektir.
+
+RRP Kart & Coin Standartları:
+- XL Kart (Zemin/Kural - 220x140): Ana vizyon, zemin veya makro çerçeve kuralı.
+- L Kart (Yapı/Ana Hedef - 180x110): Temel organizasyonel yapı, ana süreç.
+- M Kart (Atölye/Çıktı - 150x85): Üretim yapılan alan veya somut çıktı.
+- S Kart (Eylem/Görev - 130x70): Eylem adımı veya somut uygulama görevi.
+- COIN (Sorumlu/Mekân): Rol veya alan sorumlusu (ringType: KITCHEN, SERVICE, LOGISTICS, MANAGEMENT).
+- Ok Bağlantıları (edges): Kartlar arasındaki akış veya ilişki (label: "GÖREV", "YOL", "YÖNTEM", "AMAÇ", "SONUÇ", "SESSİZ", isDashed: boolean).
+
+Girdi Metni:
+"""
+${textContent}
+"""
+
+TÜM KART BAŞLIKLARINI BÜYÜK HARFLERLE ve kısa tut (Örn: "DİJİTAL DÖNÜŞÜM PANO", "MÜŞTERİ YÖNETİMİ").
+Konumları (x,y) birbirini örtmeyecek ve soldan sağa / yukarıdan aşağıya düzenli bir akış oluşturacak şekilde ver (x: 80, 320, 560, 800 | y: 80, 240, 400).
+
+Yanıtını YALNIZCA geçerli bir JSON formatında ver:
+{
+  "mapTitle": "Metinden Türetilen Harita Başlığı",
+  "mapDescription": "Metnin gerçeklik oyunu analizi özeti",
+  "items": [
+    {
+      "id": "item-1",
+      "type": "CARD",
+      "size": "XL",
+      "x": 80,
+      "y": 80,
+      "width": 220,
+      "height": 140,
+      "title": "ZEMİN PANO BAŞLIĞI",
+      "description": "net açıklama",
+      "categoryTag": "ZEMİN",
+      "frameStatus": "READY",
+      "colorHex": "#4b5563",
+      "bgHex": "#080a0f",
+      "zIndex": 1
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "fromId": "item-1",
+      "toId": "item-2",
+      "label": "GÖREV",
+      "color": "#6b7280",
+      "isDashed": false
+    }
+  ]
+}
+`;
+
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: { responseMimeType: "application/json" }
+        });
+
+        const data = JSON.parse(response.text || "{}");
+        return res.json({ success: true, result: data });
+      }
+
       if (mode === "MERGE_SCENARIOS") {
         // Senaryo Birleştirici Ajan (Çoklu Harita / PNG Resim Desteği)
         const { maps, images } = req.body;

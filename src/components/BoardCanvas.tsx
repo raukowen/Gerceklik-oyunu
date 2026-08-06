@@ -397,6 +397,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
                   fromItem={fromItem}
                   toItem={toItem}
                   isSelected={edge.id === selectedEdgeId}
+                  isQuietHighlightMode={isQuietHighlightMode}
                   onSelect={(e) => {
                     e.stopPropagation();
                     onSelectEdge(edge.id);

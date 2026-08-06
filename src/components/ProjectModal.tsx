@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProjectData } from '../types';
-import { SAMPLE_PROJECT } from '../data/constants';
+import { SAMPLE_PROJECT, BASIC_STARTER_PROJECT } from '../data/constants';
 import {
   FolderOpen,
   Save,
@@ -198,7 +198,29 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
               </h3>
 
               <div className="grid grid-cols-1 gap-2">
-                {/* Preset 1 */}
+                {/* Starter Preset */}
+                <div
+                  onClick={() => {
+                    onLoadProject(BASIC_STARTER_PROJECT);
+                    onClose();
+                  }}
+                  className="p-3 border border-gray-800 hover:border-emerald-500 bg-[#0d1117] rounded-xl cursor-pointer transition-all flex items-center justify-between"
+                >
+                  <div>
+                    <div className="font-black text-xs text-gray-100 flex items-center gap-1.5">
+                      <span className="text-emerald-400">📦</span>
+                      Başlangıç Masası (Basit Paket - v1 Beta)
+                    </div>
+                    <div className="text-[11px] text-gray-400">
+                      Sade, düzenlemeye hazır XL Zemin, L Hedef, M Çıktı, S Görev kartları ve Özne Coin.
+                    </div>
+                  </div>
+                  <button className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shrink-0 ml-2">
+                    Yükle
+                  </button>
+                </div>
+
+                {/* Preset 2 - Full Map */}
                 <div
                   onClick={() => {
                     onLoadProject(SAMPLE_PROJECT);
@@ -207,14 +229,15 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                   className="p-3 border border-gray-800 hover:border-blue-500 bg-[#0d1117] rounded-xl cursor-pointer transition-all flex items-center justify-between"
                 >
                   <div>
-                    <div className="font-black text-xs text-gray-100">
-                      🎯 Tam Gerçeklik Haritası (v5 Örnek)
+                    <div className="font-black text-xs text-gray-100 flex items-center gap-1.5">
+                      <span className="text-blue-400">🎯</span>
+                      Örnek Masa – Tam Senaryo Haritası (v1 Beta)
                     </div>
                     <div className="text-[11px] text-gray-400">
-                      XL, L, M, S kartlar, Özne/Mekân coinleri ve bağlantı okları içeren hazır set.
+                      XL, L, M, S kartlar, Özne/Mekân coinleri ve ilişkili bağlantı okları içeren detaylı örnek.
                     </div>
                   </div>
-                  <button className="px-2.5 py-1 bg-blue-600 text-white font-bold text-xs rounded-lg shrink-0 ml-2">
+                  <button className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-lg shrink-0 ml-2">
                     Yükle
                   </button>
                 </div>

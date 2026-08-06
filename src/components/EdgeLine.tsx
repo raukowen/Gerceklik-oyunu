@@ -8,6 +8,7 @@ interface EdgeLineProps {
   fromItem: BoardItem;
   toItem: BoardItem;
   isSelected: boolean;
+  isQuietHighlightMode?: boolean;
   onSelect: (e: React.MouseEvent) => void;
   onDelete?: () => void;
 }
@@ -17,14 +18,28 @@ export const EdgeLine: React.FC<EdgeLineProps> = ({
   fromItem,
   toItem,
   isSelected,
+  isQuietHighlightMode = false,
   onSelect,
   onDelete,
 }) => {
   if (!fromItem || !toItem) return null;
 
-  const { path, midPoint } = calculateEdgePath(fromItem, toItem);
-  const strokeColor = isSelected ? '#3b82f6' : '#6b7280';
+  const isQuietArrow =
+    edge.isDashed ||
+    edge.isQuiet ||
+    (edge.label && edge.label.toUpperCase().includes('SESSİZ')) ||
+    edge.color === '#6b7280' ||
+    edge.color === '#9ca3af';
+
+  const isDashed = edge.isDashed || edge.isQuiet || (isQuietHighlightMode && isQuietArrow);
+
+  let strokeColor = isSelected ? '#3b82f6' : (isQuietHighlightMode && isQuietArrow) ? '#9ca3af' : (edge.color || '#6b7280');
+  if (!isSelected && isDashed) {
+    strokeColor = '#9ca3af';
+  }
   const strokeWidth = isSelected ? 3 : 2;
+
+  const { path, midPoint } = calculateEdgePath(fromItem, toItem);
 
   return (
     <g className="group cursor-pointer" onClick={onSelect}>
@@ -43,7 +58,7 @@ export const EdgeLine: React.FC<EdgeLineProps> = ({
         fill="none"
         stroke={strokeColor}
         strokeWidth={strokeWidth}
-        strokeDasharray={edge.isDashed ? '6 4' : 'none'}
+        strokeDasharray={isDashed ? '6 4' : 'none'}
         markerEnd={`url(#arrow-${edge.id})`}
         className="transition-colors duration-150"
       />
@@ -78,9 +93,9 @@ export const EdgeLine: React.FC<EdgeLineProps> = ({
       {/* Midpoint Label & Delete Button */}
       {midPoint && (
         <foreignObject
-          x={midPoint.x - 60}
+          x={midPoint.x - 65}
           y={midPoint.y - 14}
-          width={120}
+          width={130}
           height={28}
           className="pointer-events-auto overflow-visible"
         >
@@ -89,11 +104,13 @@ export const EdgeLine: React.FC<EdgeLineProps> = ({
               className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold border shadow-lg transition-all ${
                 isSelected
                   ? 'bg-blue-600 text-white border-blue-500 ring-2 ring-blue-500/50 shadow-[0_0_12px_rgba(37,99,235,0.4)]'
+                  : isQuietHighlightMode && isQuietArrow
+                  ? 'bg-[#111827] text-gray-300 border-gray-600 ring-1 ring-gray-500/40'
                   : 'bg-[#0d1117] backdrop-blur text-gray-200 border-gray-800 group-hover:border-gray-600'
               }`}
             >
-              <span className="truncate max-w-[80px]">
-                {edge.label || 'Ok Bağlantısı'}
+              <span className="truncate max-w-[85px]">
+                {edge.label || (isQuietArrow ? 'SESSİZ OK' : 'Ok Bağlantısı')}
               </span>
 
               {/* Delete Edge Button on Select or Hover */}

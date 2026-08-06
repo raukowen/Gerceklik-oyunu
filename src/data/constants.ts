@@ -121,9 +121,131 @@ export const RING_CONFIGS: Record<
   }
 };
 
+export const BASIC_STARTER_PROJECT: ProjectData = {
+  id: 'rrp-basic-starter-v1-beta',
+  name: 'Başlangıç Masası (Basit Paket - v1 Beta)',
+  description: 'Gerçeklik Oyunu (RRP) v1 Beta düzenlenebilir sade başlangıç masası.',
+  updatedAt: new Date().toISOString(),
+  items: [
+    {
+      id: 'starter-pano',
+      type: 'CARD',
+      size: 'XL',
+      x: 80,
+      y: 80,
+      width: 220,
+      height: 140,
+      title: 'PANO / ZEMİN',
+      description: 'Ana vizyon ve çalışma zemini',
+      categoryTag: 'ZEMİN',
+      frameStatus: 'READY',
+      colorHex: '#4b5563',
+      bgHex: '#080a0f',
+      zIndex: 1
+    },
+    {
+      id: 'starter-hedef',
+      type: 'CARD',
+      size: 'L',
+      x: 340,
+      y: 80,
+      width: 180,
+      height: 110,
+      title: 'ANA HEDEF',
+      description: 'Ulaşılacak hedef ve süreç',
+      categoryTag: 'SÜREÇ',
+      frameStatus: 'IN_PROGRESS',
+      colorHex: '#4b5563',
+      bgHex: '#080a0f',
+      zIndex: 2
+    },
+    {
+      id: 'starter-cikti',
+      type: 'CARD',
+      size: 'M',
+      x: 340,
+      y: 230,
+      width: 150,
+      height: 85,
+      title: 'ÇIKTI KARTI',
+      description: 'Üretilecek temel ürün veya servis',
+      categoryTag: 'ÜRÜN',
+      frameStatus: 'NONE',
+      colorHex: '#4b5563',
+      bgHex: '#080a0f',
+      zIndex: 3
+    },
+    {
+      id: 'starter-gorev',
+      type: 'CARD',
+      size: 'S',
+      x: 560,
+      y: 80,
+      width: 130,
+      height: 70,
+      title: 'GÖREV KARTI',
+      description: 'Eylem ve uygulama adımı',
+      categoryTag: 'ALAN',
+      frameStatus: 'NONE',
+      colorHex: '#4b5563',
+      bgHex: '#080a0f',
+      zIndex: 4
+    },
+    {
+      id: 'starter-coin-ozne',
+      type: 'COIN',
+      size: 'BIG',
+      x: 150,
+      y: 260,
+      width: 84,
+      height: 84,
+      title: 'ÖZNE COIN',
+      description: 'Sorumlu kişi veya rol',
+      frameStatus: 'NONE',
+      ringType: 'KITCHEN',
+      bgHex: '#030712',
+      zIndex: 5
+    }
+  ],
+  edges: [
+    {
+      id: 'edge-s1',
+      fromId: 'starter-pano',
+      toId: 'starter-hedef',
+      label: 'GÖREV',
+      color: '#6b7280',
+      isDashed: false
+    },
+    {
+      id: 'edge-s2',
+      fromId: 'starter-hedef',
+      toId: 'starter-cikti',
+      label: 'ÜRETİM',
+      color: '#6b7280',
+      isDashed: false
+    },
+    {
+      id: 'edge-s3',
+      fromId: 'starter-hedef',
+      toId: 'starter-gorev',
+      label: 'AKIŞ',
+      color: '#6b7280',
+      isDashed: false
+    },
+    {
+      id: 'edge-s4',
+      fromId: 'starter-coin-ozne',
+      toId: 'starter-pano',
+      label: 'SORUMLU',
+      color: '#6b7280',
+      isDashed: true
+    }
+  ]
+};
+
 export const SAMPLE_PROJECT: ProjectData = {
   id: 'rrp-full-sample-map',
-  name: 'RRP Gerçeklik Oyunu – Tam Senaryo Haritası',
+  name: 'Örnek Masa – Tam Senaryo Haritası (v1 Beta)',
   description: 'Gerçeklik Oyunu (RRP) Kullanma Kılavuzundaki tam adımlı zemin, yapı, alan, ürün ve coin yerleşim örneği.',
   updatedAt: new Date().toISOString(),
   items: [

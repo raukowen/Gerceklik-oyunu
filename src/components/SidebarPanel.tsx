@@ -39,6 +39,8 @@ interface SidebarPanelProps {
   onStartConnectFrom: (id: string) => void;
   onSelectItems: (ids: string[]) => void;
   onSelectEdge: (id: string | null) => void;
+  onReplaceBoard?: (newItems: BoardItem[], newEdges: BoardEdge[], title?: string) => void;
+  onAppendBoard?: (newItems: BoardItem[], newEdges: BoardEdge[]) => void;
 }
 
 export const SidebarPanel: React.FC<SidebarPanelProps> = ({
@@ -63,6 +65,8 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({
   onStartConnectFrom,
   onSelectItems,
   onSelectEdge,
+  onReplaceBoard,
+  onAppendBoard,
 }) => {
   const [activeTab, setActiveTab] = useState<'add' | 'edit' | 'edges' | 'ai'>('add');
 
@@ -740,8 +744,13 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({
             onDeleteItem={onDeleteItem}
             onDeleteBatchItems={onDeleteBatchItems}
             onSelectItems={onSelectItems}
+            onSelectEdge={onSelectEdge}
+            onUpdateEdge={onUpdateEdge}
+            onDeleteEdge={onDeleteEdge}
             isQuietHighlightMode={isQuietHighlightMode}
             onToggleQuietHighlightMode={onToggleQuietHighlightMode}
+            onReplaceBoard={onReplaceBoard}
+            onAppendBoard={onAppendBoard}
           />
         )}
       </div>

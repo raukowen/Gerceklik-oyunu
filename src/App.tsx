@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { BoardItem, BoardEdge, ProjectData, CardSize, CoinSize } from './types';
-import { SAMPLE_PROJECT, CARD_CONFIGS, COIN_CONFIGS } from './data/constants';
+import { SAMPLE_PROJECT, BASIC_STARTER_PROJECT, CARD_CONFIGS, COIN_CONFIGS } from './data/constants';
 import { Topbar } from './components/Topbar';
 import { BoardCanvas } from './components/BoardCanvas';
 import { SidebarPanel } from './components/SidebarPanel';
@@ -8,8 +8,8 @@ import { ProjectModal } from './components/ProjectModal';
 import { HelpModal } from './components/HelpModal';
 import { ToastNotification, ToastMessage } from './components/ToastNotification';
 
-const LOCAL_STORAGE_KEY = 'gerceklik_oyunu_current_v5';
-const LOCAL_STORAGE_SAVED_KEY = 'gerceklik_oyunu_saved_projects_v5';
+const LOCAL_STORAGE_KEY = 'gerceklik_oyunu_current_v1_beta';
+const LOCAL_STORAGE_SAVED_KEY = 'gerceklik_oyunu_saved_projects_v1_beta';
 
 export default function App() {
   // Core Board State
@@ -23,7 +23,7 @@ export default function App() {
     } catch {
       // ignore
     }
-    return SAMPLE_PROJECT.items;
+    return BASIC_STARTER_PROJECT.items;
   });
 
   const [edges, setEdges] = useState<BoardEdge[]>(() => {
@@ -36,7 +36,7 @@ export default function App() {
     } catch {
       // ignore
     }
-    return SAMPLE_PROJECT.edges;
+    return BASIC_STARTER_PROJECT.edges;
   });
 
   const [projectName, setProjectName] = useState<string>('Gerçeklik Haritası');
@@ -83,7 +83,7 @@ export default function App() {
     } catch {
       // ignore
     }
-    return [SAMPLE_PROJECT];
+    return [BASIC_STARTER_PROJECT, SAMPLE_PROJECT];
   });
 
   // Toasts
@@ -468,6 +468,48 @@ export default function App() {
     addToast(`"${project.name}" yüklendi`);
   };
 
+  const handleReplaceBoard = useCallback(
+    (newItems: BoardItem[], newEdges: BoardEdge[], title?: string) => {
+      setItems(newItems);
+      setEdges(newEdges);
+      if (title) setProjectName(title);
+      setSelectedItemIds([]);
+      setSelectedEdgeId(null);
+      pushHistory(newItems, newEdges);
+      addToast('Yeni Gerçeklik Haritası masaya başarıyla yüklendi!', 'success');
+    },
+    [pushHistory, addToast]
+  );
+
+  const handleAppendBoard = useCallback(
+    (newItems: BoardItem[], newEdges: BoardEdge[]) => {
+      const offsetItems = newItems.map((item) => ({
+        ...item,
+        id: `imported-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        x: item.x + 120,
+        y: item.y + 120,
+      }));
+      const idMap = new Map<string, string>();
+      newItems.forEach((oldItem, idx) => {
+        idMap.set(oldItem.id, offsetItems[idx].id);
+      });
+      const offsetEdges = newEdges.map((edge) => ({
+        ...edge,
+        id: `edge-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        fromId: idMap.get(edge.fromId) || edge.fromId,
+        toId: idMap.get(edge.toId) || edge.toId,
+      }));
+
+      const combinedItems = [...items, ...offsetItems];
+      const combinedEdges = [...edges, ...offsetEdges];
+      setItems(combinedItems);
+      setEdges(combinedEdges);
+      pushHistory(combinedItems, combinedEdges);
+      addToast('Metinden türetilen yeni kartlar ve oklar masaya eklendi!', 'success');
+    },
+    [items, edges, pushHistory, addToast]
+  );
+
   const handleDeleteSavedProject = (id: string) => {
     const updatedList = savedProjects.filter((p) => p.id !== id);
     setSavedProjects(updatedList);
@@ -577,6 +619,8 @@ export default function App() {
       <Topbar
         isConnectMode={isConnectMode}
         onToggleConnectMode={handleToggleConnectMode}
+        isQuietHighlightMode={isQuietHighlightMode}
+        onToggleQuietHighlightMode={() => setIsQuietHighlightMode((prev) => !prev)}
         onOpenProjectModal={() => setIsProjectModalOpen(true)}
         onOpenHelpModal={() => setIsHelpModalOpen(true)}
         onOpenTemplatesModal={() => setIsProjectModalOpen(true)}
@@ -634,6 +678,8 @@ export default function App() {
           onStartConnectFrom={handleStartConnectFrom}
           onSelectItems={handleSelectItems}
           onSelectEdge={setSelectedEdgeId}
+          onReplaceBoard={handleReplaceBoard}
+          onAppendBoard={handleAppendBoard}
         />
       </div>
 
