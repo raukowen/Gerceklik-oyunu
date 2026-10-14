@@ -1,3 +1,5 @@
+import { parseBoard, isProject, isEditingTarget } from './utils/projectData';
+import { recordSnapshot, HistoryState } from './utils/history';
 import { exportPNG } from './utils/exportPNG';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { BoardItem, BoardEdge, ProjectData, CardSize, CoinSize } from './types';
@@ -13,39 +15,25 @@ const LOCAL_STORAGE_KEY = 'gerceklik_oyunu_current_v1_beta';
 const LOCAL_STORAGE_SAVED_KEY = 'gerceklik_oyunu_saved_projects_v1_beta';
 
 export default function App() {
-  // Core Board State
-  const [items, setItems] = useState<BoardItem[]>(() => {
+  // Validate saved data once before it reaches rendering or autosave.
+  const [initial] = useState(() => {
+    let invalidSaved = false;
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.items) return parsed.items;
-      }
-    } catch {
-      // ignore
-    }
-    return BASIC_STARTER_PROJECT.items;
+      const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+      invalidSaved = raw !== null;
+      const saved = JSON.parse(raw || 'null');
+      const board = parseBoard(saved);
+      if (board) return { ...board, projectName: typeof saved.projectName === 'string' ? saved.projectName : 'Gerçeklik Haritası', invalidSaved: false };
+    } catch { /* The board remains usable when browser storage is unavailable. */ }
+    return { items: BASIC_STARTER_PROJECT.items, edges: BASIC_STARTER_PROJECT.edges, projectName: 'Gerçeklik Haritası', invalidSaved };
   });
-
-  const [edges, setEdges] = useState<BoardEdge[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.edges) return parsed.edges;
-      }
-    } catch {
-      // ignore
-    }
-    return BASIC_STARTER_PROJECT.edges;
-  });
-
-  const [projectName, setProjectName] = useState<string>(() => { try { return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}').projectName || 'Gerçeklik Haritası'; } catch { return 'Gerçeklik Haritası'; } });
-
-  // History for Undo / Redo
-  const [history, setHistory] = useState<{ items: BoardItem[]; edges: BoardEdge[] }[]>(() => [{ items, edges }]);
-  const [historyIndex, setHistoryIndex] = useState<number>(0);
-  const isUndoRedoAction = useRef(false);
+  const [items, setItems] = useState<BoardItem[]>(initial.items);
+  const [edges, setEdges] = useState<BoardEdge[]>(initial.edges);
+  const [projectName, setProjectName] = useState(initial.projectName);
+  const [timeline, setTimeline] = useState<HistoryState>({ entries: [initial], index: 0 });
+  const timelineRef = useRef(timeline);
+  const history = timeline.entries;
+  const historyIndex = timeline.index;
 
   // Selection & Connect Modes
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
@@ -80,7 +68,7 @@ export default function App() {
   const [savedProjects, setSavedProjects] = useState<ProjectData[]>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_SAVED_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) { const list = JSON.parse(saved); if (Array.isArray(list)) return list.filter(isProject); }
     } catch {
       // ignore
     }
@@ -99,57 +87,63 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Save state snapshot into undo/redo history
-  const pushHistory = useCallback(
-    (newItems: BoardItem[], newEdges: BoardEdge[]) => {
+  // One bounded history entry per completed action; refs keep rapid actions ordered.
+  const pushHistory = useCallback((newItems: BoardItem[], newEdges: BoardEdge[], name = projectName) => {
+    const next = recordSnapshot(timelineRef.current, { items: newItems, edges: newEdges, projectName: name });
+    timelineRef.current = next;
+    setTimeline(next);
+  }, [projectName]);
 
-      setHistory((prev) => {
-        const sliced = prev.slice(0, historyIndex + 1);
-        return [...sliced, { items: newItems, edges: newEdges }];
-      });
-      setHistoryIndex((prev) => prev + 1);
-    },
-    [historyIndex]
-  );
-
-  // Auto-save current project to localStorage
+  const storageErrorShown = useRef(false);
   useEffect(() => {
-    try {
-      const data = { items, edges, projectName, updatedAt: new Date().toISOString() };
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-    } catch {
-      // ignore
-    }
-  }, [items, edges, projectName]);
+    const save = () => {
+      // Preserve unreadable original data until the user changes the fallback board.
+      if (initial.invalidSaved && items === initial.items && edges === initial.edges && projectName === initial.projectName) return;
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ items, edges, projectName, updatedAt: new Date().toISOString() }));
+        storageErrorShown.current = false;
+      } catch {
+        if (!storageErrorShown.current) {
+          storageErrorShown.current = true;
+          addToast('Tarayıcıya kayıt yapılamadı. Haritanızı JSON olarak dışa aktarın.', 'error');
+        }
+      }
+    };
+    const timer = window.setTimeout(save, 300);
+    const onVisibility = () => { if (document.visibilityState === 'hidden') save(); };
+    window.addEventListener('pagehide', save);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('pagehide', save);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [items, edges, projectName, addToast, initial]);
 
-  // Undo Handler
-  const handleUndo = useCallback(() => {
-    if (historyIndex > 0) {
-      isUndoRedoAction.current = true;
-      const prev = history[historyIndex - 1];
-      setItems(prev.items);
-      setEdges(prev.edges);
-      setHistoryIndex(historyIndex - 1);
-      addToast('İşlem geri alındı', 'info');
-    }
-  }, [historyIndex, history, addToast]);
-
-  // Redo Handler
-  const handleRedo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      isUndoRedoAction.current = true;
-      const next = history[historyIndex + 1];
-      setItems(next.items);
-      setEdges(next.edges);
-      setHistoryIndex(historyIndex + 1);
-      addToast('İşlem ileri alındı', 'info');
-    }
-  }, [historyIndex, history, addToast]);
+  const stepHistory = useCallback((direction: -1 | 1) => {
+    const state = timelineRef.current;
+    const index = state.index + direction;
+    if (index < 0 || index >= state.entries.length) return;
+    const snapshot = state.entries[index];
+    const next = { ...state, index };
+    timelineRef.current = next;
+    setTimeline(next);
+    setItems(snapshot.items);
+    setEdges(snapshot.edges);
+    setProjectName(snapshot.projectName);
+    setSelectedItemIds([]);
+    setSelectedEdgeId(null);
+    setIsConnectMode(false);
+    setConnectSourceId(null);
+    addToast(direction === -1 ? 'İşlem geri alındı' : 'İşlem ileri alındı', 'info');
+  }, [addToast]);
+  const handleUndo = useCallback(() => stepHistory(-1), [stepHistory]);
+  const handleRedo = useCallback(() => stepHistory(1), [stepHistory]);
 
   // Keyboard Ctrl+Z / Ctrl+Y
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) return;
+      if (isEditingTarget(e.target) || isProjectModalOpen || isHelpModalOpen) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         if (e.shiftKey) {
           e.preventDefault(); handleRedo();
@@ -157,7 +151,7 @@ export default function App() {
           e.preventDefault(); handleUndo();
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-        handleRedo();
+        e.preventDefault(); handleRedo();
       } else if (e.key === 'Escape') {
         setIsConnectMode(false);
         setConnectSourceId(null);
@@ -167,11 +161,11 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo]);
+  }, [handleUndo, handleRedo, isProjectModalOpen, isHelpModalOpen]);
 
   // Add Item (Card or Coin)
   const handleAddItem = (type: 'CARD' | 'COIN', size: CardSize | CoinSize) => {
-    const id = `${type.toLowerCase()}-${Date.now()}`;
+    const id = `${type.toLowerCase()}-${crypto.randomUUID()}`;
     const x = 300 + Math.random() * 80;
     const y = 200 + Math.random() * 80;
 
@@ -231,9 +225,10 @@ export default function App() {
 
   // Move Multiple Items Position Together
   const handleMoveMultipleItems = (deltas: { id: string; dx: number; dy: number }[]) => {
+    const deltaById = new Map(deltas.map(delta => [delta.id, delta]));
     setItems((prev) =>
       prev.map((item) => {
-        const delta = deltas.find((d) => d.id === item.id);
+        const delta = deltaById.get(item.id);
         if (delta) {
           return { ...item, x: item.x + delta.dx, y: item.y + delta.dy };
         }
@@ -265,6 +260,7 @@ export default function App() {
     setItems(updatedItems);
     setEdges(updatedEdges);
     setSelectedItemIds((prev) => prev.filter((i) => i !== id));
+    if (connectSourceId === id) { setConnectSourceId(null); setIsConnectMode(false); }
     pushHistory(updatedItems, updatedEdges);
     addToast('Öğe silindi', 'info');
   };
@@ -277,6 +273,7 @@ export default function App() {
     setItems(updatedItems);
     setEdges(updatedEdges);
     setSelectedItemIds([]);
+    if (connectSourceId && ids.includes(connectSourceId)) { setConnectSourceId(null); setIsConnectMode(false); }
     pushHistory(updatedItems, updatedEdges);
     addToast(`${ids.length} öğe silindi`, 'info');
   };
@@ -286,7 +283,7 @@ export default function App() {
     const target = items.find((i) => i.id === id);
     if (!target) return;
 
-    const newId = `${target.type.toLowerCase()}-${Date.now()}`;
+    const newId = `${target.type.toLowerCase()}-${crypto.randomUUID()}`;
     const newItem: BoardItem = {
       ...target,
       id: newId,
@@ -307,10 +304,9 @@ export default function App() {
     const targets = items.filter((i) => ids.includes(i.id));
     if (targets.length === 0) return;
 
-    const now = Date.now();
-    const newItems: BoardItem[] = targets.map((t, idx) => ({
+    const newItems: BoardItem[] = targets.map((t) => ({
       ...t,
-      id: `${t.type.toLowerCase()}-${now}-${idx}`,
+      id: `${t.type.toLowerCase()}-${crypto.randomUUID()}`,
       x: t.x + 40,
       y: t.y + 40,
       title: `${t.title} (Kopya)`,
@@ -357,6 +353,7 @@ export default function App() {
 
   // Complete Arrow Connection (Single or Batch Multi-Select)
   const handleCompleteConnect = (targetId: string) => {
+    if (!items.some(item => item.id === targetId)) return;
     // Determine sources to connect from
     let sources: string[] = [];
     if (selectedItemIds.length > 0) {
@@ -365,6 +362,7 @@ export default function App() {
       sources = [connectSourceId];
     }
 
+    sources = sources.filter(id => items.some(item => item.id === id));
     if (sources.length === 0) {
       setConnectSourceId(targetId);
       setSelectedItemIds([targetId]);
@@ -436,9 +434,8 @@ export default function App() {
 
   // Save / Load Project
   const handleSaveCurrentProject = (name: string) => {
-    setProjectName(name);
     const newProject: ProjectData = {
-      id: `proj-${Date.now()}`,
+      id: `proj-${crypto.randomUUID()}`,
       name,
       description: 'Kullanıcı tarafından kaydedilen harita',
       items,
@@ -447,22 +444,28 @@ export default function App() {
     };
 
     const updatedList = [newProject, ...savedProjects.filter((p) => p.name !== name)];
-    setSavedProjects(updatedList);
     try {
       localStorage.setItem(LOCAL_STORAGE_SAVED_KEY, JSON.stringify(updatedList));
     } catch {
-      // ignore
+      addToast('Proje kaydedilemedi. Haritanızı JSON olarak dışa aktarın.', 'error');
+      return;
     }
+    setSavedProjects(updatedList);
+    setProjectName(name);
+    pushHistory(items, edges, name);
     addToast(`"${name}" kaydedildi!`);
   };
 
   const handleLoadProject = (project: ProjectData) => {
+    if (!isProject(project)) { addToast('Geçersiz harita JSON dosyası', 'error'); return; }
+    setIsConnectMode(false);
+    setConnectSourceId(null);
     setItems(project.items || []);
     setEdges(project.edges || []);
     setProjectName(project.name || 'Gerçeklik Haritası');
     setSelectedItemIds([]);
     setSelectedEdgeId(null);
-    pushHistory(project.items || [], project.edges || []);
+    pushHistory(project.items || [], project.edges || [], project.name || 'Gerçeklik Haritası');
     addToast(`"${project.name}" yüklendi`);
   };
 
@@ -473,10 +476,10 @@ export default function App() {
       if (title) setProjectName(title);
       setSelectedItemIds([]);
       setSelectedEdgeId(null);
-      pushHistory(newItems, newEdges);
+      pushHistory(newItems, newEdges, title || projectName);
       addToast('Yeni Gerçeklik Haritası masaya başarıyla yüklendi!', 'success');
     },
-    [pushHistory, addToast]
+    [pushHistory, addToast, projectName]
   );
 
   const handleAppendBoard = useCallback(
@@ -510,12 +513,13 @@ export default function App() {
 
   const handleDeleteSavedProject = (id: string) => {
     const updatedList = savedProjects.filter((p) => p.id !== id);
-    setSavedProjects(updatedList);
     try {
       localStorage.setItem(LOCAL_STORAGE_SAVED_KEY, JSON.stringify(updatedList));
     } catch {
-      // ignore
+      addToast('Kayıtlı proje silinemedi', 'error');
+      return;
     }
+    setSavedProjects(updatedList);
     addToast('Kayıtlı proje silindi', 'info');
   };
 
@@ -534,7 +538,7 @@ export default function App() {
     a.href = url;
     a.download = `${projectName.toLowerCase().replace(/\s+/g, '_')}_v5.json`;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
     addToast('JSON harita dosyası indirildi');
   };
 
@@ -543,11 +547,17 @@ export default function App() {
     reader.onload = (e) => {
       try {
         const parsed = JSON.parse(e.target?.result as string);
-        if (parsed.items) {
-          setItems(parsed.items);
-          setEdges(parsed.edges || []);
-          if (parsed.name) setProjectName(parsed.name);
-          pushHistory(parsed.items, parsed.edges || []);
+        const board = parseBoard(parsed);
+        if (board && (parsed.name === undefined || typeof parsed.name === 'string')) {
+          setItems(board.items);
+          setEdges(board.edges);
+          const name = parsed.name || projectName;
+          setProjectName(name);
+          setSelectedItemIds([]);
+          setSelectedEdgeId(null);
+          setIsConnectMode(false);
+          setConnectSourceId(null);
+          pushHistory(board.items, board.edges, name);
           addToast('JSON haritası başarıyla yüklendi!');
         } else {
           addToast('Geçersiz harita JSON dosyası', 'error');
@@ -556,11 +566,14 @@ export default function App() {
         addToast('JSON okunurken hata oluştu', 'error');
       }
     };
+    reader.onerror = () => addToast('JSON okunurken hata oluştu', 'error');
     reader.readAsText(file);
   };
 
   // Clear Canvas Board
   const handleClearBoard = () => {
+    setIsConnectMode(false);
+    setConnectSourceId(null);
     setItems([]);
     setEdges([]);
     setSelectedItemIds([]);
@@ -619,6 +632,8 @@ export default function App() {
             onMoveMultipleItems={handleMoveMultipleItems}
             onCompleteConnect={handleCompleteConnect}
             onDeleteSelected={handleDeleteSelected}
+            onDeleteEdge={handleDeleteEdge}
+            keyboardEnabled={!isProjectModalOpen && !isHelpModalOpen}
           />
         </main>
 

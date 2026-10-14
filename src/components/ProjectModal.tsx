@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProjectData } from '../types';
 import { SAMPLE_PROJECT, BASIC_STARTER_PROJECT } from '../data/constants';
 import {
@@ -40,6 +40,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 }) => {
   const [projectNameInput, setProjectNameInput] = useState(currentProjectName);
   const [activeTab, setActiveTab] = useState<'save_load' | 'templates' | 'export_import'>('save_load');
+
+  useEffect(() => {
+    if (isOpen) setProjectNameInput(currentProjectName);
+  }, [isOpen, currentProjectName]);
 
   if (!isOpen) return null;
 

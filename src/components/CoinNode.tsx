@@ -8,7 +8,7 @@ interface CoinNodeProps {
   isSelected: boolean;
   isConnectSource: boolean;
   isConnectTargetCandidate: boolean;
-  onSelect: (e: React.MouseEvent | React.TouchEvent) => void;
+  onSelect: (e: React.MouseEvent | React.KeyboardEvent) => void;
   onMouseDown: (e: React.MouseEvent) => void;
   onTouchStart?: (e: React.TouchEvent) => void;
   onDoubleClick?: () => void;
@@ -37,11 +37,11 @@ export const CoinNode: React.FC<CoinNodeProps> = ({
   return (
     <g
       role="button" tabIndex={0} aria-label={item.title} data-item-id={item.id}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(e as any); } }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(e); } }}
       transform={`translate(${item.x}, ${item.y})`}
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}
-      onClick={onSelect}
+      onClick={(e) => { e.stopPropagation(); if (e.detail === 0) onSelect(e); }}
       onDoubleClick={onDoubleClick}
       className="cursor-move select-none group"
     >

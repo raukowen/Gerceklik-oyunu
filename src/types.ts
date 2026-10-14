@@ -33,6 +33,7 @@ export interface BoardEdge {
   label?: string;
   color?: string;
   isDashed?: boolean;
+  isQuiet?: boolean;
 }
 
 export interface ProjectData {

@@ -1,8 +1,9 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { BoardItem, BoardEdge } from '../types';
 import { CardNode } from './CardNode';
 import { CoinNode } from './CoinNode';
 import { EdgeLine } from './EdgeLine';
+import { isEditingTarget } from '../utils/projectData';
 import { getItemCenter } from '../utils/geometry';
 import { Plus, Minus, RotateCcw, Hand, MousePointer } from 'lucide-react';
 
@@ -22,6 +23,8 @@ interface BoardCanvasProps {
   onMoveMultipleItems: (deltas: { id: string; dx: number; dy: number }[]) => void;
   onCompleteConnect: (targetId: string) => void;
   onDeleteSelected: () => void;
+  onDeleteEdge: (id: string) => void;
+  keyboardEnabled?: boolean;
   onDoubleTouchOrClickItem?: (id: string) => void;
 }
 
@@ -41,8 +44,16 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
   onMoveMultipleItems,
   onCompleteConnect,
   onDeleteSelected,
+  onDeleteEdge,
+  keyboardEnabled = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const activeDrag = useRef(false);
+  const lastTouch = useRef(0);
+  const spacePressed = useRef(false);
+  const itemById = useMemo(() => new Map(items.map(item => [item.id, item])), [items]);
+  const connectedIds = useMemo(() => new Set(edges.flatMap(edge => [edge.fromId, edge.toId])), [edges]);
+  const coins = useMemo(() => isQuietHighlightMode ? items.filter(item => item.type === 'COIN') : [], [items, isQuietHighlightMode]);
 
   // Pan & Zoom state
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -87,23 +98,31 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
     setPan({ x: 0, y: 0 });
   };
 
-  // Mouse Wheel Zooming
-  const handleWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
+  // A non-passive listener prevents browser zoom/scroll during board gestures.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-      setZoom((z) => Math.min(Math.max(z * zoomFactor, 0.3), 3));
-    } else {
-      setPan((p) => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
-    }
-  };
+      if (e.ctrlKey || e.metaKey) {
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        setZoom(z => Math.min(Math.max(z * zoomFactor, 0.3), 3));
+      } else {
+        setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
+      }
+    };
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []);
 
   // Stage Pan or Rubberband Selection Mouse Down
   const handleStageMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0 && e.button !== 1) return;
     if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'svg' || (e.target as HTMLElement).tagName === 'rect') {
       const world = screenToWorld(e.clientX, e.clientY);
 
-      if (isPanMode || e.button === 1 || e.spaceKey) {
+      if (isPanMode || e.button === 1 || spacePressed.current) {
+        e.preventDefault();
         setIsPanning(true);
         setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
       } else {
@@ -121,9 +140,10 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
 
   // Stage Touch Start
   const handleStageTouchStart = (e: React.TouchEvent) => {
+    lastTouch.current = Date.now();
     if (e.touches.length === 1) {
       const touch = e.touches[0];
-      if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'svg') {
+      if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'svg' || (e.target as HTMLElement).tagName === 'rect') {
         if (isPanMode) {
           setIsPanning(true);
           setPanStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y });
@@ -137,6 +157,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
         }
       }
     } else if (e.touches.length === 2) {
+      handleMouseUp();
       const t1 = e.touches[0];
       const t2 = e.touches[1];
       const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
@@ -147,6 +168,13 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
   // Item Mouse Down for Dragging
   const handleItemMouseDown = (item: BoardItem, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (Date.now() - lastTouch.current < 750 || (e.button !== 0 && e.button !== 1)) return;
+    if (isPanMode || e.button === 1 || spacePressed.current) {
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      return;
+    }
 
     // If in connect mode, handle connect target click
     if (isConnectMode) {
@@ -174,6 +202,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
     onSelectEdge(null);
 
     const world = screenToWorld(e.clientX, e.clientY);
+    activeDrag.current = true;
     setDraggingItemId(item.id);
     setDragStartPos(world);
     setDragItemStartPos({ x: item.x, y: item.y });
@@ -182,6 +211,8 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
   // Item Touch Start for Dragging
   const handleItemTouchStart = (item: BoardItem, e: React.TouchEvent) => {
     e.stopPropagation();
+    lastTouch.current = Date.now();
+    if (e.touches.length === 2) { handleStageTouchStart(e); return; }
 
     if (e.touches.length === 1) {
       const touch = e.touches[0];
@@ -193,7 +224,11 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
         }
       }
 
-      if (isPanMode) return;
+      if (isPanMode) {
+        setIsPanning(true);
+        setPanStart({ x: touch.clientX - pan.x, y: touch.clientY - pan.y });
+        return;
+      }
 
       if (!selectedItemIds.includes(item.id)) {
         onSelectItems([item.id]);
@@ -201,6 +236,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
       onSelectEdge(null);
 
       const world = screenToWorld(touch.clientX, touch.clientY);
+      activeDrag.current = true;
       setDraggingItemId(item.id);
       setDragStartPos(world);
       setDragItemStartPos({ x: item.x, y: item.y });
@@ -210,7 +246,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
   // Mouse Move on Container
   const handleMouseMove = (e: React.MouseEvent) => {
     const world = screenToWorld(e.clientX, e.clientY);
-    setMousePos(world);
+    if (connectSourceId) setMousePos(world);
 
     if (isPanning) {
       setPan({
@@ -244,7 +280,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
         // Multi-item move
         const deltas = selectedItemIds.map((id) => ({ id, dx, dy }));
         onMoveMultipleItems(deltas);
-        setDragStartPos(world);
+        setDragStartPos({ x: dragStartPos.x + dx, y: dragStartPos.y + dy });
       } else {
         // Single item move
         const newX = dragItemStartPos.x + dx;
@@ -259,7 +295,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
     if (e.touches.length === 1) {
       const touch = e.touches[0];
       const world = screenToWorld(touch.clientX, touch.clientY);
-      setMousePos(world);
+      if (connectSourceId) setMousePos(world);
 
       if (isPanning) {
         setPan({
@@ -290,7 +326,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
         if (selectedItemIds.length > 1 && selectedItemIds.includes(draggingItemId)) {
           const deltas = selectedItemIds.map((id) => ({ id, dx, dy }));
           onMoveMultipleItems(deltas);
-          setDragStartPos(world);
+          setDragStartPos({ x: dragStartPos.x + dx, y: dragStartPos.y + dy });
         } else {
           const newX = dragItemStartPos.x + dx;
           const newY = dragItemStartPos.y + dy;
@@ -311,7 +347,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
 
   // Mouse / Touch End
   const handleMouseUp = () => {
-    if (draggingItemId) onMoveEnd?.();
+    if (activeDrag.current) { activeDrag.current = false; onMoveEnd?.(); }
     setIsPanning(false);
     setDraggingItemId(null);
     setIsSelectingBox(false);
@@ -320,26 +356,44 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
     setPinchDistance(null);
   };
 
-  // Keyboard events
+  // End gestures even when the release happens outside the board or window.
+  const finishGesture = useRef(handleMouseUp);
+  finishGesture.current = handleMouseUp;
+  useEffect(() => {
+    const finish = () => { finishGesture.current(); };
+    const blur = () => { spacePressed.current = false; finish(); };
+    window.addEventListener('mouseup', finish);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('mouseup', finish);
+      window.removeEventListener('blur', blur);
+    };
+  }, []);
+
+  // Keep board shortcuts out of dialogs and editable controls.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.key === 'Delete' ||
-        e.key === 'Backspace'
-      ) {
-        // Only if not inside input/textarea
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
-          onDeleteSelected();
-        }
+      if (!keyboardEnabled || e.defaultPrevented || isEditingTarget(e.target)) return;
+      if (e.code === 'Space' && !(e.target instanceof Element && e.target.closest('button, [role="button"]'))) {
+        spacePressed.current = true;
+        e.preventDefault();
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        onDeleteSelected();
       }
     };
+    const handleKeyUp = (e: KeyboardEvent) => { if (e.code === 'Space') spacePressed.current = false; };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onDeleteSelected]);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [onDeleteSelected, keyboardEnabled]);
 
   // Connect source item
-  const connectSourceItem = items.find((i) => i.id === connectSourceId);
+  const connectSourceItem = itemById.get(connectSourceId);
   const connectSourceCenter = connectSourceItem ? getItemCenter(connectSourceItem) : null;
 
   return (
@@ -348,11 +402,11 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
       onMouseDown={handleStageMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
       onTouchStart={handleStageTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleMouseUp}
       onTouchCancel={handleMouseUp}
-      onWheel={handleWheel}
       style={{ touchAction: 'none' }}
       className={`relative w-full h-full overflow-hidden bg-[#050608] select-none ${
         isPanMode || isPanning ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
@@ -389,8 +443,8 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
           {/* 1. EDGES LAYER */}
           <g>
             {edges.map((edge) => {
-              const fromItem = items.find((i) => i.id === edge.fromId);
-              const toItem = items.find((i) => i.id === edge.toId);
+              const fromItem = itemById.get(edge.fromId);
+              const toItem = itemById.get(edge.toId);
               if (!fromItem || !toItem) return null;
 
               return (
@@ -406,7 +460,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
                     onSelectEdge(edge.id);
                     onSelectItems([]);
                   }}
-                  onDelete={() => onDeleteSelected()}
+                  onDelete={() => onDeleteEdge(edge.id)}
                 />
               );
             })}
@@ -437,10 +491,10 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
               const isCandidate = isConnectMode && !isConnectSource;
 
               if (item.type === 'CARD') {
-                const hasCoinNear = items.some(
-                  (coin) => coin.type === 'COIN' && Math.hypot(coin.x - item.x, coin.y - item.y) < 100
+                const hasCoinNear = isQuietHighlightMode && coins.some(
+                  (coin) => Math.hypot(coin.x - item.x, coin.y - item.y) < 100
                 );
-                const hasConnectedEdge = edges.some((e) => e.fromId === item.id || e.toId === item.id);
+                const hasConnectedEdge = connectedIds.has(item.id);
                 const isCardClosed = item.frameStatus === 'CLOSED';
                 const isQuietCard = !hasCoinNear && !hasConnectedEdge && !isCardClosed;
 
