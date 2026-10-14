@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BoardItem, BoardEdge, CardSize, CoinSize, FrameStatus, RingType } from '../types';
 import { CARD_CONFIGS, COIN_CONFIGS, FRAME_STATUS_CONFIGS, RING_CONFIGS } from '../data/constants';
-import { AIAgentPanel } from './AIAgentPanel';
 import {
   Plus,
   Trash2,
@@ -68,7 +67,7 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({
   onReplaceBoard,
   onAppendBoard,
 }) => {
-  const [activeTab, setActiveTab] = useState<'add' | 'edit' | 'edges' | 'ai'>('add');
+  const [activeTab, setActiveTab] = useState<'add' | 'edit' | 'edges'>('add');
 
   const selectedItemId = selectedItemIds.length === 1 ? selectedItemIds[0] : null;
   const selectedItem = items.find((i) => i.id === selectedItemId);
@@ -103,7 +102,7 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({
       </div>
 
       {/* Tabs Header */}
-      <div className="grid grid-cols-4 p-1.5 bg-[#050608] border-b border-gray-800 text-[11px] font-bold gap-1 shrink-0">
+      <div className="grid grid-cols-3 p-1.5 bg-[#050608] border-b border-gray-800 text-[11px] font-bold gap-1 shrink-0">
         <button
           onClick={() => setActiveTab('add')}
           className={`py-2 px-1 rounded-lg transition-all flex items-center justify-center gap-1 ${
@@ -140,17 +139,7 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({
           <ArrowRightLeft size={13} />
           <span>Oklar</span>
         </button>
-        <button
-          onClick={() => setActiveTab('ai')}
-          className={`py-2 px-1 rounded-lg transition-all flex items-center justify-center gap-1 ${
-            activeTab === 'ai'
-              ? 'bg-purple-600 text-white shadow-[0_0_10px_rgba(147,51,234,0.3)]'
-              : 'text-purple-400 hover:text-purple-200 hover:bg-[#111827]'
-          }`}
-        >
-          <Sparkles size={13} />
-          <span>AI Ajan</span>
-        </button>
+
       </div>
 
       {/* Tab Contents Scrollable Body */}
@@ -723,36 +712,7 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({
           </div>
         )}
 
-        {/* TAB 4: AI AGENT PANEL */}
-        {activeTab === 'ai' && (
-          <AIAgentPanel
-            items={items}
-            edges={edges}
-            onAddEdge={(fromId, toId, label) => {
-              const newEdge: BoardEdge = {
-                id: `edge-ai-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-                fromId,
-                toId,
-                label,
-                color: '#3b82f6',
-                isDashed: false,
-              };
-              onUpdateEdge(newEdge.id, newEdge);
-            }}
-            onUpdateItem={onUpdateItem}
-            onUpdateBatchItems={onUpdateBatchItems}
-            onDeleteItem={onDeleteItem}
-            onDeleteBatchItems={onDeleteBatchItems}
-            onSelectItems={onSelectItems}
-            onSelectEdge={onSelectEdge}
-            onUpdateEdge={onUpdateEdge}
-            onDeleteEdge={onDeleteEdge}
-            isQuietHighlightMode={isQuietHighlightMode}
-            onToggleQuietHighlightMode={onToggleQuietHighlightMode}
-            onReplaceBoard={onReplaceBoard}
-            onAppendBoard={onAppendBoard}
-          />
-        )}
+
       </div>
     </aside>
   );

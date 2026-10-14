@@ -36,6 +36,8 @@ export const CoinNode: React.FC<CoinNodeProps> = ({
 
   return (
     <g
+      role="button" tabIndex={0} aria-label={item.title} data-item-id={item.id}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(e as any); } }}
       transform={`translate(${item.x}, ${item.y})`}
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}

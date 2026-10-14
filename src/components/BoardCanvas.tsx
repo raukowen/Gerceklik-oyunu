@@ -17,6 +17,7 @@ interface BoardCanvasProps {
   onSelectItems: (ids: string[]) => void;
   onSelectItemToggle: (id: string) => void;
   onSelectEdge: (id: string | null) => void;
+  onMoveEnd?: () => void;
   onMoveItem: (id: string, x: number, y: number) => void;
   onMoveMultipleItems: (deltas: { id: string; dx: number; dy: number }[]) => void;
   onCompleteConnect: (targetId: string) => void;
@@ -35,6 +36,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
   onSelectItems,
   onSelectItemToggle,
   onSelectEdge,
+  onMoveEnd,
   onMoveItem,
   onMoveMultipleItems,
   onCompleteConnect,
@@ -309,6 +311,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
 
   // Mouse / Touch End
   const handleMouseUp = () => {
+    if (draggingItemId) onMoveEnd?.();
     setIsPanning(false);
     setDraggingItemId(null);
     setIsSelectingBox(false);
@@ -372,7 +375,7 @@ export const BoardCanvas: React.FC<BoardCanvasProps> = ({
       </svg>
 
       {/* Transformable Canvas Group */}
-      <svg className="w-full h-full absolute inset-0 pointer-events-none">
+      <svg data-board="true" className="w-full h-full absolute inset-0 pointer-events-none">
         <defs>
           <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#000000" floodOpacity="0.6" />

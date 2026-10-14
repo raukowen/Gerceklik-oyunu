@@ -166,3 +166,22 @@ RRP'nin web ve AI Studio üzerindeki dijital uygulamasında Gemini altyapısıyl
 * Dokümantasyon metni bütünüyle GitHub reponuza entegre edildi.
 * Masaüstü kart, coin, ring, ok ve çerçeve mekanikleri tam detaylarıyla eklendi.
 * Step-by-step uygulama senaryosu ve AI Ajan mimarisi dokümante edildi.
+
+
+---
+
+# Gerçeklik Oyunu — ilk GitHub Pages yayını
+
+Bu klasör **ana siteye değil**, mevcut `raukowen/Gerceklik-oyunu` deposuna aktarılır.
+
+1. GitHub Desktop ile mevcut oyun deposunun son halini al. Bu klasörün içindekileri, gizli `.github` dahil, deponun köküne kopyala. Mevcut depoyu veya `.git` klasörünü silme. Çakışma varsa üzerine zorla gönderme.
+2. Değişiklikleri `main` dalına Commit + Push ile gönder.
+3. GitHub'da Settings → Pages → Source: **GitHub Actions** seç.
+4. Actions → **Gerçeklik Oyunu yayını** → Run workflow çalıştır.
+5. Yayın başarılı olduğunda https://raukowen.github.io/Gerceklik-oyunu/ adresinde oyunu aç. Aynı adresteki `zzky-game-version.json` dosyası da bulunmalıdır.
+
+Sonraki `main` gönderimleri oyunu otomatik derleyip yayımlar. Ana sitedeki oyun sayfası yeni açılışta bu yayını kullanır. Zaten açık oyunu değiştirmez; yeni sürüm için sayfayı yenile. Ana siteyi yeniden yayımlamaya gerek yoktur.
+
+Yerel derleme: Node.js 22 ile `npm ci`, ardından `npm run build:pages`. Çıktı `dist-pages/` klasörüdür. `src/` değişikliklerini bu depoda sürdür. Kilit dosyası kurulumda kullanılır; `node_modules` ve `.git` teslim paketine dahil değildir. Sunucu ve API anahtarı gerektirmeyen Pages derlemesi kullanılır; AI paneli önceki karara uygun kapalıdır.
+
+14 Ekim 2026 kontrolünde uzak deponun Pages yayını kapalıydı. Bu teslim hiçbir dosyayı GitHub'a göndermedi ve yayın ayarını değiştirmedi. İlk yayın adımları sana aittir.

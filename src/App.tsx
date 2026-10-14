@@ -1,3 +1,4 @@
+import { exportPNG } from './utils/exportPNG';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { BoardItem, BoardEdge, ProjectData, CardSize, CoinSize } from './types';
 import { SAMPLE_PROJECT, BASIC_STARTER_PROJECT, CARD_CONFIGS, COIN_CONFIGS } from './data/constants';
@@ -39,11 +40,11 @@ export default function App() {
     return BASIC_STARTER_PROJECT.edges;
   });
 
-  const [projectName, setProjectName] = useState<string>('Gerçeklik Haritası');
+  const [projectName, setProjectName] = useState<string>(() => { try { return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}').projectName || 'Gerçeklik Haritası'; } catch { return 'Gerçeklik Haritası'; } });
 
   // History for Undo / Redo
-  const [history, setHistory] = useState<{ items: BoardItem[]; edges: BoardEdge[] }[]>([]);
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const [history, setHistory] = useState<{ items: BoardItem[]; edges: BoardEdge[] }[]>(() => [{ items, edges }]);
+  const [historyIndex, setHistoryIndex] = useState<number>(0);
   const isUndoRedoAction = useRef(false);
 
   // Selection & Connect Modes
@@ -101,10 +102,6 @@ export default function App() {
   // Save state snapshot into undo/redo history
   const pushHistory = useCallback(
     (newItems: BoardItem[], newEdges: BoardEdge[]) => {
-      if (isUndoRedoAction.current) {
-        isUndoRedoAction.current = false;
-        return;
-      }
 
       setHistory((prev) => {
         const sliced = prev.slice(0, historyIndex + 1);
@@ -152,11 +149,12 @@ export default function App() {
   // Keyboard Ctrl+Z / Ctrl+Y
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         if (e.shiftKey) {
-          handleRedo();
+          e.preventDefault(); handleRedo();
         } else {
-          handleUndo();
+          e.preventDefault(); handleUndo();
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
         handleRedo();
@@ -571,47 +569,15 @@ export default function App() {
     addToast('Masa temizlendi', 'info');
   };
 
-  // Export Canvas as PNG
-  const handleExportPNG = () => {
-    const svgElem = document.querySelector('svg') as SVGElement | null;
-    if (!svgElem) return;
-
-    try {
-      const xml = new XMLSerializer().serializeToString(svgElem);
-      const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
-      const img = new Image();
-
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1600;
-        canvas.height = 1000;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#fafaf9';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-          const pngUrl = canvas.toDataURL('image/png');
-          const a = document.createElement('a');
-          a.href = pngUrl;
-          a.download = `${projectName.toLowerCase().replace(/\s+/g, '_')}_goruntusu.png`;
-          a.click();
-          addToast('🖼️ PNG Görseli indirildi!');
-        }
-        URL.revokeObjectURL(url);
-      };
-
-      img.src = url;
-    } catch {
-      addToast('PNG oluşturulurken hata oluştu', 'error');
-    }
+  const handleExportPNG = async () => {
+    try { await exportPNG(items, edges, projectName); addToast('🖼️ PNG Görseli indirildi!'); }
+    catch { addToast('PNG oluşturulurken hata oluştu', 'error'); }
   };
 
   const connectSourceItem = items.find((i) => i.id === connectSourceId);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-stone-100 overflow-hidden text-gray-900 font-sans">
+    <div className="h-dvh w-full flex flex-col bg-stone-100 overflow-hidden text-gray-900 font-sans">
       {/* Toast Notifications */}
       <ToastNotification toasts={toasts} onDismiss={dismissToast} />
 
@@ -649,6 +615,7 @@ export default function App() {
             onSelectItemToggle={handleSelectItemToggle}
             onSelectEdge={setSelectedEdgeId}
             onMoveItem={handleMoveItem}
+            onMoveEnd={() => pushHistory(items, edges)}
             onMoveMultipleItems={handleMoveMultipleItems}
             onCompleteConnect={handleCompleteConnect}
             onDeleteSelected={handleDeleteSelected}

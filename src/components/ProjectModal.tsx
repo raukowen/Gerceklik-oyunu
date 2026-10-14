@@ -67,6 +67,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
             </div>
           </div>
           <button
+            aria-label="Proje penceresini kapat"
             onClick={onClose}
             className="p-1 text-gray-400 hover:text-gray-100 rounded-lg hover:bg-gray-800"
           >
